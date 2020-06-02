@@ -173,6 +173,7 @@ class UniRepForLM(UniRepAbstractModel):
 
         if targets is not None:
             # the changes will go here
+            # the second round of changes
             targets = targets[:, 1:]
             prediction_scores = prediction_scores[:, :-1]
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
