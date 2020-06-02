@@ -172,11 +172,13 @@ class UniRepForLM(UniRepAbstractModel):
         outputs = (prediction_scores,) + outputs[2:]
 
         if targets is not None:
+            # the changes will go here
             targets = targets[:, 1:]
             prediction_scores = prediction_scores[:, :-1]
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
             lm_loss = loss_fct(
                 prediction_scores.view(-1, self.config.vocab_size), targets.view(-1))
+
             outputs = (lm_loss,) + outputs
 
         # (loss), prediction_scores, (hidden_states)
