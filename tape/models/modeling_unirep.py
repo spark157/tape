@@ -172,13 +172,19 @@ class UniRepForLM(UniRepAbstractModel):
         outputs = (prediction_scores,) + outputs[2:]
 
         if targets is not None:
-            # the changes will go here
-            # the second round of changes
-            targets = targets[:, 1:]
-            prediction_scores = prediction_scores[:, :-1]
+            targets = targets[:, 1:] #shift targets over 1 to predict next token
+            # Need to adjust the targets to get rid of the stop token
+            # otherwise will throw error for the CrossEntropyLoss
+            targets[torch.where(targets == 25)] = -1 # ignore index
+            targets = targets.contiguous() # otherwise taking .view is problem
+            
+            prediction_scores = prediction_scores[:, :-1]  # dropping the last aa
+            prediction_scores = prediction_scores.contiguous()
+
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
+            # view should match output of self.feedforward
             lm_loss = loss_fct(
-                prediction_scores.view(-1, self.config.vocab_size), targets.view(-1))
+                prediction_scores.view(-1, self.config.vocab_size-1), targets.view(-1))
 
             outputs = (lm_loss,) + outputs
 
