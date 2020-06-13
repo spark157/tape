@@ -780,6 +780,43 @@ class ValuePredictionHead(nn.Module):
         return outputs  # (loss), value_prediction
 
 
+class ValuePredictionHeadWithAttention(nn.Module):
+    ''' Version to include attention in the weighting in an effort to
+        reproduce the paper results.
+    '''
+    def __init__(self, hidden_size: int, dropout: float = 0.1): #note dropout default is 0.1
+        super().__init__()
+        
+        self.attention = torch.nn.Parameter(torch.FloatTensor(*(hidden_size,1)))
+        torch.nn.init.xavier_normal_(self.attention)                                            
+        self.dropout = nn.Dropout(dropout, inplace=True) # added 
+        self.layernorm = nn.LayerNorm(hidden_size)
+        # dropout here is 0.5 as per code for paper
+        self.value_prediction = nn.Sequential(nn.LayerNorm(hidden_size),
+                                              nn.Linear(hidden_size, 512),
+                                              nn.ReLU(),nn.Dropout(0.5, inplace=True),
+                                              nn.Linear(512, 1))
+
+
+    def forward(self, x_in, targets=None):
+        x_in = self.layernorm(x_in)
+        attention_score = torch.matmul(x_in, self.attention).squeeze(dim=2)
+        attention_score = self.dropout(attention_score)
+        attention_score = F.softmax(attention_score, dim = 1).view(x_in.size(0), x_in.size(1), 1)
+        scored_x = x_in * attention_score
+
+        condensed_x = torch.sum(scored_x, dim=1)
+        
+        value_pred = self.value_prediction(condensed_x)
+        outputs = (value_pred,)
+
+        if targets is not None:
+            loss_fct = nn.MSELoss()
+            value_pred_loss = loss_fct(value_pred, targets)
+            outputs = (value_pred_loss,) + outputs
+        return outputs  # (loss), value_prediction
+    
+
 class SequenceClassificationHead(nn.Module):
     def __init__(self, hidden_size: int, num_labels: int):
         super().__init__()
