@@ -32,6 +32,7 @@ from .modeling_utils import get_activation_fn
 from .modeling_utils import LayerNorm
 from .modeling_utils import MLMHead
 from .modeling_utils import ValuePredictionHead
+from .modeling_utils import ValuePredictionHeadWithAttention
 from .modeling_utils import SequenceClassificationHead
 from .modeling_utils import SequenceToSequenceClassificationHead
 from .modeling_utils import PairwiseContactPredictionHead
@@ -371,8 +372,9 @@ class ProteinBertPooler(nn.Module):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
-        pooled_output = self.dense(first_token_tensor)
-        pooled_output = self.activation(pooled_output)
+        pooled_output = first_token_tensor # added this line to reflect comment
+        #pooled_output = self.dense(first_token_tensor)
+        #pooled_output = self.activation(pooled_output)
         return pooled_output
 
 
@@ -498,7 +500,9 @@ class ProteinBertForValuePrediction(ProteinBertAbstractModel):
         super().__init__(config)
 
         self.bert = ProteinBertModel(config)
-        self.predict = ValuePredictionHead(config.hidden_size)
+        #self.predict = ValuePredictionHead(config.hidden_size) # simple MLP
+        # version with attention to try to match published results
+        self.predict = ValuePredictionHeadWithAttention(config.hidden_size) 
 
         self.init_weights()
 
@@ -507,7 +511,10 @@ class ProteinBertForValuePrediction(ProteinBertAbstractModel):
         outputs = self.bert(input_ids, input_mask=input_mask)
 
         sequence_output, pooled_output = outputs[:2]
-        outputs = self.predict(pooled_output, targets) + outputs[2:]
+        # outputs = self.predict(pooled_output, targets) + outputs[2:]
+        # instead of pooled_output pass in the sequence
+        # drop the cls/sep tokens
+        outputs = self.predict(sequence_output[:,1:-1,:], targets) + outputs[2:]
         # (loss), prediction_scores, (hidden_states), (attentions)
         return outputs
 
